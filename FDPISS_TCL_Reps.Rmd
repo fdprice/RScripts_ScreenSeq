@@ -229,26 +229,15 @@ SAM <- y$samples$lib.size
 #Finding a model
 
 ```{r fig.width=14, fig.height=12}
-#eXAMPLE fILES from Tims data
 
-#mycolorsx <-c("firebrick3","darkgreen","limegreen","blue", "deepskyblue")
+IDENTITY <- read.delim("E:/FEO/Replicate MOFO analysis/Combodeal/IDENTITY.txt", header=FALSE)
 
-#Identity<-factor(c("SN" ,   "SN",  "SN",  "SN",  "SN",  "SN",  "VTA",	"VTA",	"VTA",	"VTA",	"VTA",	"VTA",	"OLF",	"OLF",	"HYP",	"HYP",	"HCRT",	"HCRT",	"HCRT",	"HCRT"	,"HCRT"	,"HCRT"))
+Group = factor(IDENTITY$V1)
 
-#Timepoint<-factor(c("e15.5" ,   "e15.5","p2"	,"p2","adult","adult","e15.5","e15.5","p2","p2","adult","adult","adult","adult","adult","adult",	"e15.5",	"e15.5",	"p0",	"p0",	"adult",	"adult") )
-
-gsub("([Run1])", "\\1_\\1_", "abc and ABC")
-
-XX <- gsub("Run1_*", "Run1", COL) 
-
-Batch <- factor(c(""))
-
-colnames(dataAll2)
-
-Group = factor(paste(Identity,Timepoint,sep=".")) #combine identity and time
 design <- model.matrix(~0+Group) #design matrix without intercept
 temp = colnames(design) #just get the names, will need for next step
 colnames(design) = unlist(lapply(strsplit(temp,"Group"),function(x) x[2])) #remove the word "Group" from names
+
 
 y <- estimateGLMCommonDisp(y, design) #nice to calculate all 3 forms of dispersion
 y <- estimateGLMTrendedDisp(y, design)
@@ -300,7 +289,164 @@ grid3d(side="z", at=list(z=0))
 
 
 
+#Plate1 only MOF
+
+
+
 ```{r}
+setwd("E:/FEO/Replicate MOFO analysis/Combodeal")
+
+Real_Col_Names <- read.delim("C:/Users/timahfeldt/Downloads/Real_Col_Names.txt")
+#feo make sure you change this line when you import the data set, for you it is header=False
+
+
+
+
+TCL1<- read.delim("E:/FEO/Replicate MOFO analysis/Combodeal/M1.unq.refseq.umi.txt")
+TCL2<- read.delim("E:/FEO/Replicate MOFO analysis/Combodeal/M2.unq.refseq.umi.txt")
+TCL3<- read.delim("E:/FEO/Replicate MOFO analysis/Combodeal/M3.unq.refseq.umi.txt")
+TCL5<- read.delim("E:/FEO/Replicate MOFO analysis/Combodeal/M5.unq.refseq.umi.txt")
+
+SCMYO<- read.delim("E:/FEO/Replicate MOFO analysis/Combodeal/Feo_positive_controls.unq.refseq.umi.SC_and_Myoblast_Raw.txt")
+
+
+names(TCL1) <- Real_Col_Names$X.1
+names(TCL2) <- Real_Col_Names$X.1
+names(TCL3) <- Real_Col_Names$X.1
+names(TCL5) <- Real_Col_Names$X.1
+
+colnames(TCL1) <- paste("Run1", colnames(TCL1), sep = "_")
+colnames(TCL2) <- paste("Run2", colnames(TCL2), sep = "_")
+colnames(TCL3) <- paste("Run3", colnames(TCL3), sep = "_")
+colnames(TCL5) <- paste("Run5", colnames(TCL5), sep = "_")
+
+Bounddata<- cbind(SCMYO[1:14], TCL1[2:385])
+#write.table(Bounddata,file="Bounddata.txt",sep="\t", row.names = FALSE)
+
+#THe following takes more computational power, maintains gene names between datasets... bla
+
+#names(TCL1)[1] <- "X"
+#names(TCL2)[1] <- "X"
+#names(TCL3)[1] <- "X"
+#names(TCL5)[1] <- "X"
+
+#data = merge(SCMYO, TCL1, by.X = "X", by.y = "X")
+#data2 = merge(data, TCL2, by.X = "X", by.y = "X")
+#data3 = merge(data2, TCL3, by.X = "X", by.y = "X")
+#data4 = merge(data3, TCL5, by.X = "X", by.y = "X")
+
+
+#write.table(data4,file="data.txt",sep="\t")
+
+data = Bounddata
+#no gene information remove me
+data = data[!is.na(data$X),]
+#duplicated gene name remove me
+data = data[!duplicated(data$X), ]
+
+```
+
+
+
+#MDS plot to identify outliers
+#-INDEX FUNCTION TO REMOVE DUPLICATE IN gENE sYMBOL 
+# DATAALLu30 FUNCTION TO REMOVE ROWS WERE GENE EXPRESSION is low (meaning 2 columns more than 15 and you stay used name 30 in previous versions and so kept the name, also dont forget that the number 15 is completly arbitrary and there are ways to determine what a good cut-off is)
+# MDS Plot of the data dataALLU<-data[!duplicated(data$X), ]
+
+```{r fig.width=14, fig.height=12}
+
+dataALL1<-data[,c(2:398)]
+row.names(dataALL1) <- data$X
+
+
+dataALL1<-dataALL1[apply(dataALL1,1,function(x)sum(abs(x) >= 1) >=1 ),] 
+
+
+y <- DGEList(counts=dataALL1, genes=row.names(dataALL1))  
+y = calcNormFactors(y, na.rm = FALSE)
+
+mds<- plotMDS(y, top=500, gene.selection="common",dim.plot=c(1,2), cex=.7)
+
+COL = colnames(dataALL1)
+
+barplot(y$samples$lib.size*1e-6, names = COL, las=2, ylab="Library size (Tarjey Units)")
+
+SAM <- y$samples$lib.size
+
+write.table(SAM,file="SAM.txt",sep="\t")
+write.table(COL,file="COL.txt",sep="\t")
+
+G = cbind(COL, SAM, deparse.level = 1)
+F = rbind(COL, SAM, deparse.level = 1)
+X = 10000
+
+newG <- subset(G, SAM >= 10000)
+
+GT = t(newG)
+
+write.table(GT,file="GT.txt",sep="\t")
+
+#We filter for samples with lib size >10000
+
+GT2 = GT[1,]
+
+# Write a function to eliminiate samples start with samples that have lower counts than 10000
+
+
+data2 = data[,GT2,drop=FALSE]
+row.names(data2) <- data$X
+
+dataALL2<-data2[apply(data2,1,function(x)sum(abs(x) >= 1) >=1 ),] 
+write.table(dataALL2,file="dataALL2.txt",sep="\t")
+
+y <- DGEList(counts=dataALL2, genes=row.names(dataALL2))  
+y = calcNormFactors(y)
+
+Landmark_Genes_n978 <- read.delim("E:/FEO/Replicate MOFO analysis/Landmark_Genes_n978.txt", dec=",")
+GGG <- tolower(Landmark_Genes_n978$Gene.Symbol)
+YYY<-gsub("(^|[[:space:]])([[:alpha:]])", "\\1\\U\\2", GGG, perl=TRUE)
+
+
+
+plot.data = dataALL2[row.names(dataALL2) %in% YYY,]
+
+y <- DGEList(counts=plot.data, genes=row.names(plot.data))  
+y = calcNormFactors(y)
+
+
+mds<- plotMDS(y, top=500, gene.selection="common",dim.plot=c(1,2), cex=.7)
+
+mds<- plotMDS(y, top=500, gene.selection="common",dim.plot=c(1,3), cex=.7)
+
+mds<- plotMDS(y, top=100, gene.selection="common",dim.plot=c(1,2), cex=.7)
+
+mds<- plotMDS(y, top=100, gene.selection="common",dim.plot=c(1,5), cex=.7)
+```
+
+
+
+
+#Load up L1000 list and intersect with data before MDS
+
+
+```{r}
+
+Landmark_Genes_n978 <- read.delim("E:/FEO/Replicate MOFO analysis/Landmark_Genes_n978.txt", dec=",")
+GGG <- tolower(Landmark_Genes_n978$Gene.Symbol)
+YYY<-gsub("(^|[[:space:]])([[:alpha:]])", "\\1\\U\\2", GGG, perl=TRUE)
+
+
+
+plot.data = dataALL2[row.names(dataALL2) %in% YYY,]
+
+y <- DGEList(counts=plot.data, genes=row.names(plot.data))  
+y = calcNormFactors(y)
+
+
+mds<- plotMDS(y, top=500, gene.selection="common",dim.plot=c(1,2), cex=.7)
+
+
+
 #Try to summarize the data Mag proposal
 setwd("E:/FEO/Replicate MOFO analysis/Combodeal")
 
